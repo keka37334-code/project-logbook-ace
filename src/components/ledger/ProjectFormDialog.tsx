@@ -59,6 +59,8 @@ export function ProjectFormDialog({ open, onOpenChange, initial, onSubmit }: Pro
       pic: "",
       progress: 0,
       status: "Planning",
+      budget: 0,
+      spent: 0,
     },
   });
 
@@ -74,6 +76,8 @@ export function ProjectFormDialog({ open, onOpenChange, initial, onSubmit }: Pro
               endDate: new Date(initial.endDate),
               progress: initial.progress,
               status: initial.status,
+              budget: initial.budget,
+              spent: initial.spent,
             }
           : {
               name: "",
@@ -83,6 +87,8 @@ export function ProjectFormDialog({ open, onOpenChange, initial, onSubmit }: Pro
               endDate: undefined as unknown as Date,
               progress: 0,
               status: "Planning",
+              budget: 0,
+              spent: 0,
             },
       );
     }
