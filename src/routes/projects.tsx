@@ -123,7 +123,10 @@ function ProjectsPage() {
   };
 
   const handleSubmit = (v: ProjectFormValues) => {
+    const now = new Date().toISOString();
     if (editing) {
+      const changed =
+        editing.progress !== v.progress || editing.status !== v.status;
       const updated: Project = {
         ...editing,
         name: v.name,
@@ -135,6 +138,12 @@ function ProjectsPage() {
         status: v.status,
         budget: v.budget,
         spent: v.spent,
+        history: changed
+          ? [
+              ...editing.history,
+              { at: now, progress: v.progress, status: v.status, note: "Pembaruan dari form edit." },
+            ]
+          : editing.history,
       };
       persist(projects.map((p) => (p.id === editing.id ? updated : p)));
       toast.success("Proyek diperbarui");
@@ -151,7 +160,10 @@ function ProjectsPage() {
         budget: v.budget,
         spent: v.spent,
         archived: false,
-        createdAt: new Date().toISOString(),
+        history: [
+          { at: now, progress: v.progress, status: v.status, note: "Proyek dibuat." },
+        ],
+        createdAt: now,
       };
       persist([created, ...projects]);
       toast.success("Proyek ditambahkan");
