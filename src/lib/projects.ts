@@ -13,6 +13,9 @@ export const projectSchema = z
     endDate: z.string().min(1, "Tanggal selesai wajib"),
     progress: z.number().int().min(0).max(100),
     status: z.enum(STATUSES),
+    budget: z.number().nonnegative().default(0),
+    spent: z.number().nonnegative().default(0),
+    archived: z.boolean().default(false),
     createdAt: z.string(),
   })
   .refine((d) => new Date(d.endDate) >= new Date(d.startDate), {
@@ -31,15 +34,21 @@ export const projectFormSchema = z
     endDate: z.date({ required_error: "Pilih tanggal selesai" }),
     progress: z.coerce.number().int().min(0, "Min 0").max(100, "Maks 100"),
     status: z.enum(STATUSES),
+    budget: z.coerce.number().nonnegative("Anggaran tidak boleh negatif").max(1e15, "Nilai terlalu besar"),
+    spent: z.coerce.number().nonnegative("Realisasi tidak boleh negatif").max(1e15, "Nilai terlalu besar"),
   })
   .refine((d) => d.endDate >= d.startDate, {
     message: "Tanggal selesai harus setelah tanggal mulai",
     path: ["endDate"],
+  })
+  .refine((d) => d.spent <= d.budget, {
+    message: "Realisasi tidak boleh melebihi anggaran",
+    path: ["spent"],
   });
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
 
-const STORAGE_KEY = "proyek-ledger:projects:v1";
+const STORAGE_KEY = "proyek-ledger:projects:v2";
 
 function seed(): Project[] {
   const now = new Date().toISOString();
@@ -53,6 +62,9 @@ function seed(): Project[] {
       endDate: "2024-12-20",
       progress: 82,
       status: "In Review",
+      budget: 750_000_000,
+      spent: 615_000_000,
+      archived: false,
       createdAt: now,
     },
     {
@@ -64,6 +76,9 @@ function seed(): Project[] {
       endDate: "2024-10-15",
       progress: 45,
       status: "On Track",
+      budget: 220_000_000,
+      spent: 99_000_000,
+      archived: false,
       createdAt: now,
     },
     {
@@ -75,6 +90,9 @@ function seed(): Project[] {
       endDate: "2024-11-30",
       progress: 15,
       status: "Planning",
+      budget: 512_000_000,
+      spent: 76_800_000,
+      archived: false,
       createdAt: now,
     },
   ];
@@ -108,4 +126,12 @@ export function saveProjects(projects: Project[]) {
 export function newId() {
   const n = Math.floor(1000 + Math.random() * 9000);
   return `PRJ-${new Date().getFullYear()}-${n}`;
+}
+
+export function formatIDR(value: number): string {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value);
 }
