@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,11 +25,13 @@ import {
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import {
+  formatIDR,
   loadProjects,
   newId,
   saveProjects,
   STATUSES,
   type Project,
+  type ProjectFormValues,
   type ProjectStatus,
 } from "@/lib/projects";
 import { ProjectFormDialog } from "@/components/ledger/ProjectFormDialog";
@@ -39,12 +42,12 @@ export const Route = createFileRoute("/projects")({
       { title: "Manajemen Proyek — ProyekLedger" },
       {
         name: "description",
-        content: "Buat, ubah, dan kelola daftar proyek: deskripsi, PIC, tanggal, dan status progres.",
+        content: "Buat, ubah, arsipkan proyek beserta alokasi anggaran dan progresnya.",
       },
       { property: "og:title", content: "Manajemen Proyek — ProyekLedger" },
       {
         property: "og:description",
-        content: "Modul lengkap untuk mengelola portofolio proyek dengan progres dan status.",
+        content: "Modul lengkap untuk mengelola portofolio proyek, anggaran, dan arsip.",
       },
     ],
   }),
@@ -59,10 +62,13 @@ const statusStyles: Record<ProjectStatus, string> = {
   Completed: "border-audit-blue text-audit-blue",
 };
 
+type View = "active" | "archived";
+
 function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ProjectStatus>("all");
+  const [view, setView] = useState<View>("active");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -71,9 +77,19 @@ function ProjectsPage() {
     setProjects(loadProjects());
   }, []);
 
+  const counts = useMemo(
+    () => ({
+      active: projects.filter((p) => !p.archived).length,
+      archived: projects.filter((p) => p.archived).length,
+    }),
+    [projects],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return projects.filter((p) => {
+      if (view === "active" && p.archived) return false;
+      if (view === "archived" && !p.archived) return false;
       if (statusFilter !== "all" && p.status !== statusFilter) return false;
       if (!q) return true;
       return (
@@ -82,7 +98,14 @@ function ProjectsPage() {
         p.id.toLowerCase().includes(q)
       );
     });
-  }, [projects, query, statusFilter]);
+  }, [projects, query, statusFilter, view]);
+
+  const totals = useMemo(() => {
+    const active = projects.filter((p) => !p.archived);
+    const budget = active.reduce((s, p) => s + p.budget, 0);
+    const spent = active.reduce((s, p) => s + p.spent, 0);
+    return { budget, spent, remaining: Math.max(budget - spent, 0) };
+  }, [projects]);
 
   const persist = (next: Project[]) => {
     setProjects(next);
@@ -99,15 +122,7 @@ function ProjectsPage() {
     setDialogOpen(true);
   };
 
-  const handleSubmit = (v: {
-    name: string;
-    description?: string;
-    pic: string;
-    startDate: Date;
-    endDate: Date;
-    progress: number;
-    status: ProjectStatus;
-  }) => {
+  const handleSubmit = (v: ProjectFormValues) => {
     if (editing) {
       const updated: Project = {
         ...editing,
@@ -118,6 +133,8 @@ function ProjectsPage() {
         endDate: v.endDate.toISOString().slice(0, 10),
         progress: v.progress,
         status: v.status,
+        budget: v.budget,
+        spent: v.spent,
       };
       persist(projects.map((p) => (p.id === editing.id ? updated : p)));
       toast.success("Proyek diperbarui");
@@ -131,11 +148,19 @@ function ProjectsPage() {
         endDate: v.endDate.toISOString().slice(0, 10),
         progress: v.progress,
         status: v.status,
+        budget: v.budget,
+        spent: v.spent,
+        archived: false,
         createdAt: new Date().toISOString(),
       };
       persist([created, ...projects]);
       toast.success("Proyek ditambahkan");
     }
+  };
+
+  const toggleArchive = (p: Project) => {
+    persist(projects.map((x) => (x.id === p.id ? { ...x, archived: !x.archived } : x)));
+    toast.success(p.archived ? "Proyek dipulihkan" : "Proyek diarsipkan");
   };
 
   const confirmDelete = () => {
@@ -158,7 +183,7 @@ function ProjectsPage() {
           </div>
           <h1 className="text-3xl font-medium tracking-tight">Daftar Proyek</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Buat, ubah, dan kelola seluruh proyek beserta progresnya.
+            Tambah, ubah, arsipkan proyek dan kelola alokasi anggarannya.
           </p>
         </div>
         <Button onClick={handleAdd} className="bg-ink text-primary-foreground hover:opacity-90">
@@ -168,7 +193,40 @@ function ProjectsPage() {
       </header>
 
       <main className="max-w-7xl mx-auto space-y-4">
-        <div className="flex flex-col md:flex-row gap-3">
+        {/* Budget summary */}
+        <section className="grid grid-cols-1 md:grid-cols-3 border border-ledger-border bg-paper">
+          <div className="p-5 md:border-r border-b md:border-b-0 border-ledger-border">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+              Total Anggaran (Aktif)
+            </div>
+            <div className="text-xl font-mono tabular-nums">{formatIDR(totals.budget)}</div>
+          </div>
+          <div className="p-5 md:border-r border-b md:border-b-0 border-ledger-border">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+              Realisasi
+            </div>
+            <div className="text-xl font-mono tabular-nums text-audit-blue">
+              {formatIDR(totals.spent)}
+            </div>
+          </div>
+          <div className="p-5">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+              Sisa Anggaran
+            </div>
+            <div className="text-xl font-mono tabular-nums text-success-ink">
+              {formatIDR(totals.remaining)}
+            </div>
+          </div>
+        </section>
+
+        {/* Controls */}
+        <div className="flex flex-col md:flex-row md:items-center gap-3">
+          <Tabs value={view} onValueChange={(v) => setView(v as View)}>
+            <TabsList>
+              <TabsTrigger value="active">Aktif ({counts.active})</TabsTrigger>
+              <TabsTrigger value="archived">Arsip ({counts.archived})</TabsTrigger>
+            </TabsList>
+          </Tabs>
           <Input
             placeholder="Cari nama, PIC, atau ID…"
             value={query}
@@ -191,10 +249,11 @@ function ProjectsPage() {
           </Select>
         </div>
 
+        {/* Table */}
         <div className="bg-paper border border-ledger-border">
           <div className="p-4 border-b border-ledger-border bg-secondary/40 flex justify-between items-center">
             <h2 className="text-sm font-bold uppercase tracking-widest">
-              Registrasi Proyek
+              {view === "active" ? "Registrasi Proyek" : "Arsip Proyek"}
             </h2>
             <span className="text-xs font-mono text-muted-foreground">
               {filtered.length} entri
@@ -208,6 +267,7 @@ function ProjectsPage() {
                   <th className="p-4">Proyek</th>
                   <th className="p-4">PIC</th>
                   <th className="p-4">Periode</th>
+                  <th className="p-4 min-w-[200px]">Anggaran</th>
                   <th className="p-4 min-w-[180px]">Progres</th>
                   <th className="p-4">Status</th>
                   <th className="p-4 text-right">Aksi</th>
@@ -216,72 +276,108 @@ function ProjectsPage() {
               <tbody className="text-sm">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-10 text-center text-muted-foreground">
-                      Belum ada proyek. Klik <span className="font-semibold">Proyek Baru</span> untuk menambah.
+                    <td colSpan={7} className="p-10 text-center text-muted-foreground">
+                      {view === "active"
+                        ? "Belum ada proyek aktif. Klik Proyek Baru untuk menambah."
+                        : "Belum ada proyek di arsip."}
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((p) => (
-                    <tr
-                      key={p.id}
-                      className="ledger-row border-b border-ledger-border/60 hover:bg-accent transition-colors align-top"
-                    >
-                      <td className="p-4">
-                        <div className="font-semibold">{p.name}</div>
-                        <div className="text-xs text-muted-foreground font-mono">ID: {p.id}</div>
-                        {p.description && (
-                          <div className="text-xs text-muted-foreground mt-1 max-w-md line-clamp-2">
-                            {p.description}
+                  filtered.map((p) => {
+                    const used = p.budget > 0 ? Math.min((p.spent / p.budget) * 100, 100) : 0;
+                    const over = p.spent > p.budget;
+                    return (
+                      <tr
+                        key={p.id}
+                        className="ledger-row border-b border-ledger-border/60 hover:bg-accent transition-colors align-top"
+                      >
+                        <td className="p-4">
+                          <div className="font-semibold">{p.name}</div>
+                          <div className="text-xs text-muted-foreground font-mono">ID: {p.id}</div>
+                          {p.description && (
+                            <div className="text-xs text-muted-foreground mt-1 max-w-md line-clamp-2">
+                              {p.description}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-4">{p.pic}</td>
+                        <td className="p-4 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                          {format(new Date(p.startDate), "dd MMM yyyy")}
+                          <br />
+                          {format(new Date(p.endDate), "dd MMM yyyy")}
+                        </td>
+                        <td className="p-4">
+                          <div className="font-mono tabular-nums text-xs">
+                            {formatIDR(p.spent)}{" "}
+                            <span className="text-muted-foreground">/ {formatIDR(p.budget)}</span>
                           </div>
-                        )}
-                      </td>
-                      <td className="p-4">{p.pic}</td>
-                      <td className="p-4 font-mono text-xs text-muted-foreground whitespace-nowrap">
-                        {format(new Date(p.startDate), "dd MMM yyyy")}
-                        <br />
-                        {format(new Date(p.endDate), "dd MMM yyyy")}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 h-2 bg-muted relative">
+                          <div className="mt-2 h-1.5 bg-muted relative">
                             <div
-                              className="absolute inset-y-0 left-0 bg-audit-blue"
-                              style={{ width: `${p.progress}%` }}
+                              className={`absolute inset-y-0 left-0 ${over ? "bg-destructive" : "bg-audit-blue"}`}
+                              style={{ width: `${used}%` }}
                             />
                           </div>
-                          <span className="text-xs font-mono tabular-nums w-10 text-right">
-                            {p.progress}%
+                          <div className="mt-1 text-[10px] font-mono text-muted-foreground">
+                            {p.budget > 0 ? `${used.toFixed(1)}% terpakai` : "—"}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 h-2 bg-muted relative">
+                              <div
+                                className="absolute inset-y-0 left-0 bg-audit-blue"
+                                style={{ width: `${p.progress}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-mono tabular-nums w-10 text-right">
+                              {p.progress}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <span
+                            className={`px-2 py-0.5 border text-[10px] font-bold uppercase whitespace-nowrap ${statusStyles[p.status]}`}
+                          >
+                            {p.status}
                           </span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={`px-2 py-0.5 border text-[10px] font-bold uppercase whitespace-nowrap ${statusStyles[p.status]}`}
-                        >
-                          {p.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right whitespace-nowrap">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleEdit(p)}
-                          aria-label="Ubah"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setDeleteId(p.id)}
-                          aria-label="Hapus"
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td className="p-4 text-right whitespace-nowrap">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEdit(p)}
+                            aria-label="Ubah"
+                            title="Ubah"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => toggleArchive(p)}
+                            aria-label={p.archived ? "Pulihkan" : "Arsipkan"}
+                            title={p.archived ? "Pulihkan" : "Arsipkan"}
+                          >
+                            {p.archived ? (
+                              <ArchiveRestore className="w-4 h-4" />
+                            ) : (
+                              <Archive className="w-4 h-4" />
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setDeleteId(p.id)}
+                            aria-label="Hapus"
+                            title="Hapus"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -301,7 +397,8 @@ function ProjectsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus proyek?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tindakan ini tidak dapat dibatalkan. Data proyek akan dihapus permanen.
+              Tindakan ini tidak dapat dibatalkan. Pertimbangkan untuk mengarsipkan
+              jika Anda hanya ingin menyembunyikannya.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

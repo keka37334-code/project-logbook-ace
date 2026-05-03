@@ -59,6 +59,8 @@ export function ProjectFormDialog({ open, onOpenChange, initial, onSubmit }: Pro
       pic: "",
       progress: 0,
       status: "Planning",
+      budget: 0,
+      spent: 0,
     },
   });
 
@@ -74,6 +76,8 @@ export function ProjectFormDialog({ open, onOpenChange, initial, onSubmit }: Pro
               endDate: new Date(initial.endDate),
               progress: initial.progress,
               status: initial.status,
+              budget: initial.budget,
+              spent: initial.spent,
             }
           : {
               name: "",
@@ -83,6 +87,8 @@ export function ProjectFormDialog({ open, onOpenChange, initial, onSubmit }: Pro
               endDate: undefined as unknown as Date,
               progress: 0,
               status: "Planning",
+              budget: 0,
+              spent: 0,
             },
       );
     }
@@ -262,6 +268,34 @@ export function ProjectFormDialog({ open, onOpenChange, initial, onSubmit }: Pro
                     <FormLabel>Progres (%)</FormLabel>
                     <FormControl>
                       <Input type="number" min={0} max={100} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="budget"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Anggaran (IDR)</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={0} step={1000} placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="spent"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Realisasi (IDR)</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={0} step={1000} placeholder="0" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
