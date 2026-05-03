@@ -3,6 +3,14 @@ import { z } from "zod";
 export const STATUSES = ["Planning", "On Track", "In Review", "At Risk", "Completed"] as const;
 export type ProjectStatus = (typeof STATUSES)[number];
 
+export const progressEntrySchema = z.object({
+  at: z.string(),
+  progress: z.number().int().min(0).max(100),
+  status: z.enum(STATUSES),
+  note: z.string().max(500).optional().default(""),
+});
+export type ProgressEntry = z.infer<typeof progressEntrySchema>;
+
 export const projectSchema = z
   .object({
     id: z.string(),
@@ -16,6 +24,7 @@ export const projectSchema = z
     budget: z.number().nonnegative().default(0),
     spent: z.number().nonnegative().default(0),
     archived: z.boolean().default(false),
+    history: z.array(progressEntrySchema).default([]),
     createdAt: z.string(),
   })
   .refine((d) => new Date(d.endDate) >= new Date(d.startDate), {
