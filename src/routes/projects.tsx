@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { Archive, ArchiveRestore, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -304,7 +304,13 @@ function ProjectsPage() {
                         className="ledger-row border-b border-ledger-border/60 hover:bg-accent transition-colors align-top"
                       >
                         <td className="p-4">
-                          <div className="font-semibold">{p.name}</div>
+                          <Link
+                            to="/projects/$projectId"
+                            params={{ projectId: p.id }}
+                            className="font-semibold hover:underline underline-offset-2"
+                          >
+                            {p.name}
+                          </Link>
                           <div className="text-xs text-muted-foreground font-mono">ID: {p.id}</div>
                           {p.description && (
                             <div className="text-xs text-muted-foreground mt-1 max-w-md line-clamp-2">
@@ -354,6 +360,11 @@ function ProjectsPage() {
                           </span>
                         </td>
                         <td className="p-4 text-right whitespace-nowrap">
+                          <Button asChild size="sm" variant="ghost" title="Detail">
+                            <Link to="/projects/$projectId" params={{ projectId: p.id }} aria-label="Detail">
+                              <Eye className="w-4 h-4" />
+                            </Link>
+                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"
