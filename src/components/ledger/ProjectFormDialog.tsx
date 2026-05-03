@@ -273,6 +273,34 @@ export function ProjectFormDialog({ open, onOpenChange, initial, onSubmit }: Pro
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="budget"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Anggaran (IDR)</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={0} step={1000} placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="spent"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Realisasi (IDR)</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={0} step={1000} placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             <DialogFooter>
