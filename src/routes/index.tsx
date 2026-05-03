@@ -20,7 +20,7 @@ function Index() {
             PT. Artha Citra Nusantara
           </h1>
         </div>
-        <div className="flex gap-8 md:text-right">
+        <div className="flex flex-wrap gap-6 md:gap-8 md:text-right items-end">
           <div>
             <div className="text-[10px] font-bold uppercase text-muted-foreground/70">
               Periode Fiskal
@@ -33,6 +33,12 @@ function Index() {
             </div>
             <div className="text-sm font-mono text-success-ink">VERIFIED</div>
           </div>
+          <Link
+            to="/projects"
+            className="px-3 py-1.5 bg-ink text-primary-foreground text-[11px] font-bold uppercase tracking-wider hover:opacity-90 transition-opacity"
+          >
+            Kelola Proyek
+          </Link>
         </div>
       </header>
 
