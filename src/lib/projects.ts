@@ -3,6 +3,14 @@ import { z } from "zod";
 export const STATUSES = ["Planning", "On Track", "In Review", "At Risk", "Completed"] as const;
 export type ProjectStatus = (typeof STATUSES)[number];
 
+export const progressEntrySchema = z.object({
+  at: z.string(),
+  progress: z.number().int().min(0).max(100),
+  status: z.enum(STATUSES),
+  note: z.string().max(500).optional().default(""),
+});
+export type ProgressEntry = z.infer<typeof progressEntrySchema>;
+
 export const projectSchema = z
   .object({
     id: z.string(),
@@ -16,6 +24,7 @@ export const projectSchema = z
     budget: z.number().nonnegative().default(0),
     spent: z.number().nonnegative().default(0),
     archived: z.boolean().default(false),
+    history: z.array(progressEntrySchema).default([]),
     createdAt: z.string(),
   })
   .refine((d) => new Date(d.endDate) >= new Date(d.startDate), {
@@ -52,6 +61,8 @@ const STORAGE_KEY = "proyek-ledger:projects:v2";
 
 function seed(): Project[] {
   const now = new Date().toISOString();
+  const d = (offsetDays: number) =>
+    new Date(Date.now() + offsetDays * 86400000).toISOString();
   return [
     {
       id: "PRJ-2024-001",
@@ -65,6 +76,11 @@ function seed(): Project[] {
       budget: 750_000_000,
       spent: 615_000_000,
       archived: false,
+      history: [
+        { at: d(-30), progress: 40, status: "On Track", note: "Pengadaan server tahap 1." },
+        { at: d(-14), progress: 65, status: "On Track", note: "Instalasi rack & jaringan selesai." },
+        { at: d(-3), progress: 82, status: "In Review", note: "UAT internal dimulai." },
+      ],
       createdAt: now,
     },
     {
@@ -79,6 +95,10 @@ function seed(): Project[] {
       budget: 220_000_000,
       spent: 99_000_000,
       archived: false,
+      history: [
+        { at: d(-20), progress: 15, status: "Planning", note: "Scoping & kickoff." },
+        { at: d(-7), progress: 45, status: "On Track", note: "Pentest eksternal berjalan." },
+      ],
       createdAt: now,
     },
     {
@@ -93,6 +113,9 @@ function seed(): Project[] {
       budget: 512_000_000,
       spent: 76_800_000,
       archived: false,
+      history: [
+        { at: d(-2), progress: 15, status: "Planning", note: "Inventori skema database." },
+      ],
       createdAt: now,
     },
   ];
